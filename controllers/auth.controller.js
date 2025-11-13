@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+// 🧱 Registrar usuario normal
 exports.register = async (req, res) => {
   const { name, email, password } = req.body;
   try {
@@ -12,16 +13,21 @@ exports.register = async (req, res) => {
     const user = new User({ name, email, password: hashedPassword });
     await user.save();
 
-    const token = jwt.sign({ id: user._id, membership: user.membership }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign(
+      { id: user._id, membership: user.membership, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
     res.json({
-      message: 'Inicio de sesión exitoso.',
+      message: 'Registro exitoso.',
       token,
       user: {
         id: user._id,
-        name: user.name,            // ← Este campo es crucial
+        name: user.name,
         email: user.email,
-        membership: user.membership
+        membership: user.membership,
+        role: user.role
       }
     });
   } catch (err) {
@@ -29,6 +35,7 @@ exports.register = async (req, res) => {
   }
 };
 
+// 🔐 Iniciar sesión (user o admin)
 exports.login = async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -38,14 +45,55 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: 'Contraseña incorrecta.' });
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign(
+      { id: user._id, membership: user.membership, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
     res.json({
       message: 'Inicio de sesión exitoso.',
       token,
-      user: { id: user._id, name: user.name, email: user.email, membership: user.membership }
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        membership: user.membership,
+        role: user.role
+      }
     });
   } catch (err) {
     res.status(500).json({ message: 'Error en el servidor', error: err.message });
   }
 };
+
+// Verificar token (middleware)
+exports.verifyToken = (req, res, next) => {
+  const token = req.headers['authorization']?.split(' ')[1];
+  if (!token) return res.status(403).json({ message: 'Token requerido.' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(401).json({ message: 'Token inválido o expirado.' });
+  }
+};
+
+// Verificar si el usuario es administrador
+exports.verifyAdmin = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado.' });
+
+    if (user.role !== 'admin') {
+      return res.status(403).json({ message: 'Acceso denegado: solo administradores.' });
+    }
+
+    next();
+  } catch (err) {
+    res.status(500).json({ message: 'Error al verificar el rol del usuario.', error: err.message });
+  }
+};
+
