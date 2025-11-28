@@ -3,7 +3,7 @@ const router = express.Router();
 const Recipe = require('../models/Recipe');
 const { verifyToken, verifyAdmin } = require('../controllers/auth.controller');
 
-// 🔍 Buscar recetas por ingredientes (público)
+//  Buscar recetas por ingredientes (público)
 router.get('/search', async (req, res) => {
   const raw = req.query.ingredient;
   if (!raw) return res.status(400).json({ message: 'Faltan ingredientes en la consulta' });
@@ -11,14 +11,17 @@ router.get('/search', async (req, res) => {
   const ingredientes = raw.split(',').map(i => i.trim().toLowerCase());
 
   try {
-    const recipes = await Recipe.find({ ingredientes: { $all: ingredientes } });
+    const recipes = await Recipe.find({
+      "ingredientes.nombre": { $all: ingredientes }
+    });
+
     res.json(recipes);
   } catch (err) {
     res.status(500).json({ message: 'Error en la búsqueda', error: err.message });
   }
 });
 
-// 👑 Obtener todas las recetas solo si es admin
+//  Obtener todas las recetas solo si es admin
 router.get('/admin', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const recetas = await Recipe.find();
@@ -28,7 +31,7 @@ router.get('/admin', verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// 🆕 Agregar receta (solo admin)
+//  Agregar receta (solo admin)
 router.post('/admin/add', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const newRecipe = new Recipe(req.body);
@@ -43,7 +46,7 @@ router.post('/admin/add', verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// ✏️ Modificar receta (solo admin)
+//  Modificar receta (solo admin)
 router.put('/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const receta = await Recipe.findByIdAndUpdate(
@@ -63,7 +66,7 @@ router.put('/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// 🗑️ Eliminar receta (solo admin)
+//  Eliminar receta (solo admin)
 router.delete('/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const receta = await Recipe.findByIdAndDelete(req.params.id);
@@ -75,7 +78,7 @@ router.delete('/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// 📚 Obtener todas las recetas (público)
+//  Obtener todas las recetas (público)
 router.get('/', async (req, res) => {
   try {
     const recetas = await Recipe.find();
@@ -85,7 +88,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 📖 Obtener receta por ID (público)
+//  Obtener receta por ID (público)
 router.get('/:id', async (req, res) => {
   try {
     const receta = await Recipe.findById(req.params.id);
