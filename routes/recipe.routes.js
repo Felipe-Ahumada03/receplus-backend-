@@ -3,11 +3,7 @@ const router = express.Router();
 const Recipe = require('../models/Recipe');
 const { verifyToken, verifyAdmin } = require('../controllers/auth.controller');
 
-/* ============================================================
-   📌 RUTAS PÚBLICAS (NO REQUIEREN TOKEN)
-   ============================================================ */
-
-// Buscar recetas por ingredientes
+// 🔍 Buscar recetas por ingredientes (público)
 router.get('/search', async (req, res) => {
   const raw = req.query.ingredient;
   if (!raw) return res.status(400).json({ message: 'Faltan ingredientes en la consulta' });
@@ -22,34 +18,8 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// Obtener todas las recetas (público)
-router.get('/', async (req, res) => {
-  try {
-    const recetas = await Recipe.find();
-    res.json(recetas);
-  } catch (err) {
-    res.status(500).json({ message: 'Error al obtener las recetas', error: err.message });
-  }
-});
-
-// Obtener receta por ID (público)
-router.get('/:id', async (req, res) => {
-  try {
-    const receta = await Recipe.findById(req.params.id);
-    if (!receta) return res.status(404).json({ message: 'Receta no encontrada' });
-    res.json(receta);
-  } catch (err) {
-    res.status(500).json({ message: 'Error al buscar la receta', error: err.message });
-  }
-});
-
-
-/* ============================================================
-   🔐 RUTAS ADMIN (REQUERIR TOKEN + ADMIN)
-   ============================================================ */
-
-// Obtener todas las recetas (modo admin, con más control)
-router.get('/admin/all', verifyToken, verifyAdmin, async (req, res) => {
+// 👑 Obtener todas las recetas solo si es admin
+router.get('/admin', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const recetas = await Recipe.find();
     res.json(recetas);
@@ -58,7 +28,7 @@ router.get('/admin/all', verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// Agregar receta (solo admin)
+// 🆕 Agregar receta (solo admin)
 router.post('/admin/add', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const newRecipe = new Recipe(req.body);
@@ -68,14 +38,20 @@ router.post('/admin/add', verifyToken, verifyAdmin, async (req, res) => {
       data: newRecipe
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error al agregar la receta', error: error.message });
+    console.error(error);
+    res.status(500).json({ message: 'Error al agregar la receta' });
   }
 });
 
-// Modificar receta (solo admin)
+// ✏️ Modificar receta (solo admin)
 router.put('/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const receta = await Recipe.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const receta = await Recipe.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+
     if (!receta) return res.status(404).json({ message: 'Receta no encontrada' });
 
     res.json({
@@ -87,7 +63,7 @@ router.put('/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// Eliminar receta (solo admin)
+// 🗑️ Eliminar receta (solo admin)
 router.delete('/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const receta = await Recipe.findByIdAndDelete(req.params.id);
@@ -96,6 +72,28 @@ router.delete('/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
     res.json({ message: 'Receta eliminada correctamente' });
   } catch (err) {
     res.status(500).json({ message: 'Error al eliminar la receta', error: err.message });
+  }
+});
+
+// 📚 Obtener todas las recetas (público)
+router.get('/', async (req, res) => {
+  try {
+    const recetas = await Recipe.find();
+    res.json(recetas);
+  } catch (err) {
+    res.status(500).json({ message: 'Error al obtener las recetas', error: err.message });
+  }
+});
+
+// 📖 Obtener receta por ID (público)
+router.get('/:id', async (req, res) => {
+  try {
+    const receta = await Recipe.findById(req.params.id);
+    if (!receta) return res.status(404).json({ message: 'Receta no encontrada' });
+
+    res.json(receta);
+  } catch (err) {
+    res.status(500).json({ message: 'Error al buscar la receta', error: err.message });
   }
 });
 
