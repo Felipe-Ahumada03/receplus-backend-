@@ -81,13 +81,13 @@ exports.verifyToken = (req, res, next) => {
   }
 };
 
+// Verificar si el usuario es administrador
 exports.verifyAdmin = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado.' });
 
-    // ACEPTA admin, Admin, ADMIN, administrador, etc.
-    if (!user.role || user.role.toLowerCase() !== 'admin') {
+    if (user.role !== 'admin') {
       return res.status(403).json({ message: 'Acceso denegado: solo administradores.' });
     }
 
@@ -96,5 +96,4 @@ exports.verifyAdmin = async (req, res, next) => {
     res.status(500).json({ message: 'Error al verificar el rol del usuario.', error: err.message });
   }
 };
-
 
