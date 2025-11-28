@@ -95,20 +95,57 @@ router.post('/admin/add', verifyToken, verifyAdmin, async (req, res) => {
 //  Modificar receta (solo admin)
 router.put('/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
   try {
+    let updateData = { ...req.body };
+
+    // Si el usuario envía ingredientes como texto plano:
+    // "3 piezas pepino; 2 cucharadas azúcar"
+    if (typeof updateData.ingredientes === "string") {
+      updateData.ingredientes = updateData.ingredientes
+        .split(";")
+        .map((i) => i.trim())
+        .filter((i) => i.length > 0)
+        .map((linea) => {
+          const partes = linea.split(" ");
+
+          // cantidad = primeras 2 palabras → "3 piezas"
+          const cantidad = partes.slice(0, 2).join(" ");
+
+          // nombre = el resto → "pepino"
+          const nombre = partes.slice(2).join(" ");
+
+          return { nombre, cantidad };
+        });
+    }
+
+    // Si ya viene como array de objetos, se respeta:
+    // [{ nombre: "...", cantidad: "..." }]
+    if (Array.isArray(updateData.ingredientes)) {
+      updateData.ingredientes = updateData.ingredientes.map((ing) => ({
+        nombre: ing.nombre,
+        cantidad: ing.cantidad,
+      }));
+    }
+
     const receta = await Recipe.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true }
     );
 
-    if (!receta) return res.status(404).json({ message: 'Receta no encontrada' });
+    if (!receta) {
+      return res.status(404).json({ message: 'Receta no encontrada' });
+    }
 
     res.json({
       message: 'Receta actualizada correctamente',
       data: receta
     });
+    
   } catch (err) {
-    res.status(500).json({ message: 'Error al actualizar la receta', error: err.message });
+    res.status(500).json({
+      message: 'Error al actualizar la receta',
+      error: err.message
+    });
   }
 });
 
