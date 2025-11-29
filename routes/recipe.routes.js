@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const Recipe = require('../models/Recipe');
-const Preferences = require('../models/Preferences');
 const { verifyToken, verifyAdmin } = require('../controllers/auth.controller');
 
 //  Buscar recetas por ingredientes (público)
