@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const adminRoutes = require('./routes/admin.routes');
 
 
 // Cargar variables del .env
@@ -30,6 +31,7 @@ const contactRoutes = require('./routes/contact.routes');
 app.use('/api/contact', contactRoutes);
 const preferenceRoutes = require('./routes/preference.routes');
 app.use('/api/preferences', preferenceRoutes);
+app.use('/api/admin', adminRoutes);
 
 
 // Arranque del servidor
