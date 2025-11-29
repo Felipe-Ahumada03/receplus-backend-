@@ -183,4 +183,62 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// BÚSQUEDA INTELIGENTE BASADA EN PREFERENCIAS + INGREDIENTES DEL USUARIO
+router.get('/smart-search', async (req, res) => {
+  try {
+    const { userId, ingredient } = req.query;
+
+    if (!userId || !ingredient)
+      return res.status(400).json({ message: 'Faltan datos.' });
+
+    // Convertir ingredientes del usuario a array
+    const userIngredients = ingredient.split(',').map(i => i.trim().toLowerCase());
+
+    // 1️⃣ Obtener preferencias del usuario
+    const prefs = await Preferences.findOne({ userId });
+
+    const excludedFoods = [];
+    const favoriteTypes = prefs?.favorites || [];
+    
+    if (prefs?.notPreferred) {
+      prefs.notPreferred.split(',').forEach(item => excludedFoods.push(item.trim().toLowerCase()));
+    }
+
+    if (prefs?.allergies) {
+      prefs.allergies.split(',').forEach(item => excludedFoods.push(item.trim().toLowerCase()));
+    }
+
+    // 2️⃣ Buscar recetas que coincidan con ingredientes del usuario
+    const recipes = await Recipe.find({
+      'ingredientes.nombre': { $in: userIngredients }
+    });
+
+    // 3️⃣ Filtrar recetas según preferencias
+    const filtered = recipes.filter(r => {
+      // Sacar los ingredientes de la receta
+      const recipeIngredients = r.ingredientes.map(i => i.nombre.toLowerCase());
+
+      // ❌ Excluir si contiene algo que no le gusta o alergia
+      for (let bad of excludedFoods) {
+        if (recipeIngredients.includes(bad)) return false;
+      }
+
+      return true;
+    });
+
+    // 4️⃣ Priorizar recetas del tipo favorito
+    const sorted = filtered.sort((a, b) => {
+      const aFav = favoriteTypes.includes(a.tipo);
+      const bFav = favoriteTypes.includes(b.tipo);
+      return (aFav === bFav) ? 0 : aFav ? -1 : 1;
+    });
+
+    res.json(sorted);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error en la búsqueda.' });
+  }
+});
+
+
 module.exports = router;
