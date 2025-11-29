@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Recipe = require('../models/Recipe');
+const Preferences = require('../models/Preferences');
 const { verifyToken, verifyAdmin } = require('../controllers/auth.controller');
 
 //  Buscar recetas por ingredientes (público)
@@ -192,51 +193,35 @@ router.get('/smart-search', async (req, res) => {
       return res.status(400).json({ message: 'Faltan datos.' });
 
     // Convertir ingredientes del usuario a array
-    const userIngredients = ingredient.split(',').map(i => i.trim().toLowerCase());
+    const ingredientes = ingredient.split(',').map(i => i.trim().toLowerCase());
 
-    // 1️⃣ Obtener preferencias del usuario
-    const prefs = await Preferences.findOne({ userId });
+    // Obtener preferencias del usuario
+    const userPrefs = await Preferences.findOne({ userId });
+    if (!userPrefs) return res.status(404).json({ message: 'No se encontraron preferencias para el usuario.' });
 
-    const excludedFoods = [];
-    const favoriteTypes = prefs?.favorites || [];
-    
-    if (prefs?.notPreferred) {
-      prefs.notPreferred.split(',').forEach(item => excludedFoods.push(item.trim().toLowerCase()));
-    }
+    const { favorites = [], notPreferred = [], restrictions = [], allergies = [] } = userPrefs;
 
-    if (prefs?.allergies) {
-      prefs.allergies.split(',').forEach(item => excludedFoods.push(item.trim().toLowerCase()));
-    }
+    // Crear condiciones de búsqueda para MongoDB
+    const condiciones = ingredientes.map(ing => ({
+      "ingredientes.nombre": { $regex: new RegExp(ing, 'i') }
+    }));
 
-    // 2️⃣ Buscar recetas que coincidan con ingredientes del usuario
-    const recipes = await Recipe.find({
-      'ingredientes.nombre': { $in: userIngredients }
+    let recetas = await Recipe.find({ $and: condiciones });
+
+    // Filtrar según preferencias y restricciones
+    recetas = recetas.filter(r => {
+      const nombres = r.ingredientes.map(i => i.nombre.toLowerCase());
+      // Excluir si contiene algo de notPreferred, restrictions o allergies
+      const containsExcluded = [...notPreferred, ...restrictions, ...allergies].some(x =>
+        nombres.includes(x.toLowerCase())
+      );
+      return !containsExcluded;
     });
 
-    // 3️⃣ Filtrar recetas según preferencias
-    const filtered = recipes.filter(r => {
-      // Sacar los ingredientes de la receta
-      const recipeIngredients = r.ingredientes.map(i => i.nombre.toLowerCase());
+    res.json(recetas);
 
-      // ❌ Excluir si contiene algo que no le gusta o alergia
-      for (let bad of excludedFoods) {
-        if (recipeIngredients.includes(bad)) return false;
-      }
-
-      return true;
-    });
-
-    // 4️⃣ Priorizar recetas del tipo favorito
-    const sorted = filtered.sort((a, b) => {
-      const aFav = favoriteTypes.includes(a.tipo);
-      const bFav = favoriteTypes.includes(b.tipo);
-      return (aFav === bFav) ? 0 : aFav ? -1 : 1;
-    });
-
-    res.json(sorted);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error en la búsqueda.' });
+    res.status(500).json({ message: 'Error en la búsqueda inteligente', error: err.message });
   }
 });
 
